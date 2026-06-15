@@ -71,8 +71,9 @@ end
 -- User Interface (Alias Manager)
 -- ==========================================
 
+-- Made the window wider (480 instead of 400)
 local UI = CreateFrame("Frame", "AliasManagerFrame", UIParent, "BasicFrameTemplateWithInset")
-UI:SetSize(400, 450)
+UI:SetSize(480, 450) 
 UI:SetPoint("CENTER")
 UI:Hide()
 tinsert(UISpecialFrames, "AliasManagerFrame")
@@ -81,24 +82,18 @@ UI.title = UI:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 UI.title:SetPoint("CENTER", UI.TitleBg, "CENTER", 0, 0)
 UI.title:SetText("Alias Manager")
 
---- DRAG FUNCTIONALITY ---
+-- Window Dragging Functionality
 UI:SetMovable(true)
-UI:SetClampedToScreen(true) -- Prevents dragging the window completely off-screen
-
--- Create an invisible drag handle over the title bar
+UI:SetClampedToScreen(true) 
 local dragFrame = CreateFrame("Frame", nil, UI)
 dragFrame:SetPoint("TOPLEFT", UI, "TOPLEFT", 0, 0)
-dragFrame:SetPoint("BOTTOMRIGHT", UI, "TOPRIGHT", 0, -30) -- Covers the top 30 pixels (title bar)
+dragFrame:SetPoint("BOTTOMRIGHT", UI, "TOPRIGHT", 0, -30)
 dragFrame:EnableMouse(true)
 dragFrame:RegisterForDrag("LeftButton")
+dragFrame:SetScript("OnDragStart", function() UI:StartMoving() end)
+dragFrame:SetScript("OnDragStop", function() UI:StopMovingOrSizing() end)
 
-dragFrame:SetScript("OnDragStart", function() 
-    UI:StartMoving() 
-end)
-dragFrame:SetScript("OnDragStop", function() 
-    UI:StopMovingOrSizing() 
-end)
-
+-- Inputs
 local aliasInput = CreateFrame("EditBox", nil, UI, "InputBoxTemplate")
 aliasInput:SetSize(120, 30)
 aliasInput:SetPoint("TOPLEFT", UI, "TOPLEFT", 20, -40)
@@ -108,7 +103,7 @@ aliasLabel:SetPoint("BOTTOMLEFT", aliasInput, "TOPLEFT", 0, 0)
 aliasLabel:SetText("Alias (e.g., /hi)")
 
 local cmdInput = CreateFrame("EditBox", nil, UI, "InputBoxTemplate")
-cmdInput:SetSize(160, 30)
+cmdInput:SetSize(220, 30) -- Made the input slightly wider to match the new UI
 cmdInput:SetPoint("LEFT", aliasInput, "RIGHT", 15, 0)
 cmdInput:SetAutoFocus(false)
 local cmdLabel = UI:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -120,7 +115,7 @@ scrollFrame:SetPoint("TOPLEFT", UI, "TOPLEFT", 15, -100)
 scrollFrame:SetPoint("BOTTOMRIGHT", UI, "BOTTOMRIGHT", -35, 15)
 
 local contentFrame = CreateFrame("Frame", nil, scrollFrame)
-contentFrame:SetSize(350, 400)
+contentFrame:SetSize(430, 400) -- Expanded to fit the new scroll frame width
 scrollFrame:SetScrollChild(contentFrame)
 
 local aliasRows = {}
@@ -135,22 +130,39 @@ local function UpdateAliasList()
         local row = aliasRows[rowIndex]
         if not row then
             row = CreateFrame("Frame", nil, contentFrame)
-            row:SetSize(350, 30)
+            -- Made rows slightly taller (40) to accommodate wrapped text
+            row:SetSize(430, 40) 
             
-            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            row.text:SetPoint("LEFT", row, "LEFT", 5, 0)
+            -- COLUMN 1: Alias (Fixed Width)
+            row.aliasText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            row.aliasText:SetPoint("LEFT", row, "LEFT", 5, 0)
+            row.aliasText:SetWidth(80) 
+            row.aliasText:SetJustifyH("LEFT")
             
+            -- COLUMN 3: Remove Button (Fixed Width)
             row.deleteBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
             row.deleteBtn:SetSize(60, 22)
             row.deleteBtn:SetPoint("RIGHT", row, "RIGHT", -5, 0)
             row.deleteBtn:SetText("Remove")
+
+            -- COLUMN 2: Command (Dynamic Width, Fills middle space)
+            row.cmdText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            -- Anchor LEFT to the Alias text, Anchor RIGHT to the Delete button
+            row.cmdText:SetPoint("LEFT", row.aliasText, "RIGHT", 10, 0)
+            row.cmdText:SetPoint("RIGHT", row.deleteBtn, "LEFT", -15, 0)
+            row.cmdText:SetJustifyH("LEFT")
+            row.cmdText:SetJustifyV("MIDDLE")
+            row.cmdText:SetWordWrap(true) -- Enables text wrapping
+            row.cmdText:SetMaxLines(2) -- Prevents massive commands from breaking the UI height
             
             aliasRows[rowIndex] = row
         end
 
-        row.text:SetText("|cFFFFFF00" .. alias .. "|r  ->  " .. command)
+        row.aliasText:SetText("|cFFFFFF00" .. alias .. "|r")
+        row.cmdText:SetText(command)
+        
         row.deleteBtn:SetScript("OnClick", function()
-            UnregisterAlias(alias) -- Dynamically unregister from the game
+            UnregisterAlias(alias)
             AliasDB[alias] = nil
             print("|cFF00FF00Alias removed:|r", alias)
             UpdateAliasList()
@@ -159,7 +171,7 @@ local function UpdateAliasList()
         row:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, yOffset)
         row:Show()
 
-        yOffset = yOffset - 35
+        yOffset = yOffset - 45 -- Increased spacing between rows for the taller text limits
         rowIndex = rowIndex + 1
     end
 end
@@ -178,7 +190,7 @@ addBtn:SetScript("OnClick", function()
         a = string.lower(a)
         
         AliasDB[a] = c
-        RegisterAlias(a, c) -- Dynamically register to the game
+        RegisterAlias(a, c) 
         
         aliasInput:SetText("")
         cmdInput:SetText("")
