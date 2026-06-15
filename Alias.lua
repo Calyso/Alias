@@ -292,7 +292,7 @@ function RegisterAlias(alias, targetCommand)
         local executeString = targetCommand
 
         -- Print the action to the system chat (DefaultChatFrame)
-        print("|cFF00CCFFAlias:|r " .. alias .. " > " .. targetCommand)
+        print("|cFF00CCFFAlias Used:|r " .. alias .. " > " .. targetCommand)
 
         if msg and msg ~= "" then
             executeString = executeString .. " " .. msg
