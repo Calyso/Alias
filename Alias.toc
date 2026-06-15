@@ -2,7 +2,7 @@
 ## Title: Alias
 ## Notes: Allows creation of custom Linux-style chat command aliases.
 ## Author: Caly-Zul'jin
-## Version: 1.0.6
+## Version: 1.1
 ## SavedVariables: AliasDB
 
 Alias.lua
