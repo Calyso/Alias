@@ -10,61 +10,62 @@ local RegisterAlias
 local UnregisterAlias
 local UpdateMinimapPosition
 
--- Initialize database and load existing aliases natively
-local EventFrame = CreateFrame("Frame")
-EventFrame:RegisterEvent("ADDON_LOADED")
-EventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
-    if loadedAddon == addonName then
-        AliasDB = AliasDB or {}
-        
-        -- Set default minimap position if it doesn't exist
-        AliasDB.minimapPos = AliasDB.minimapPos or (math.pi / 4) -- Default to ~45 degrees (top right)
-        UpdateMinimapPosition(AliasDB.minimapPos)
+-- ==========================================
+-- Minimap Button (Moved Up for Proper Compilation)
+-- ==========================================
 
-        local tempDB = {}
-        for alias, cmd in pairs(AliasDB) do
-            if alias ~= "minimapPos" then -- Ignore the minimap variable
-                local lowerAlias = string.lower(alias)
-                tempDB[lowerAlias] = cmd
-                RegisterAlias(lowerAlias, cmd) 
-            end
-        end
+local minimapBtn = CreateFrame("Button", "AliasMinimapButton", Minimap)
+minimapBtn:SetSize(31, 31)
+minimapBtn:SetFrameLevel(8)
+minimapBtn:RegisterForDrag("RightButton", "LeftButton")
+
+-- 1. Background (The circle background behind the icon)
+local bg = minimapBtn:CreateTexture(nil, "BACKGROUND")
+bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
+bg:SetSize(25, 25)
+bg:SetPoint("TOPLEFT", 2, -4)
+
+-- 2. The Icon (Zoomed and clipped via TexCoord)
+local icon = minimapBtn:CreateTexture(nil, "ARTWORK")
+icon:SetTexture("Interface\\Icons\\INV_Scroll_03") 
+icon:SetSize(20, 20)
+icon:SetPoint("TOPLEFT", 7, -6)
+-- This crops the square edges to make it fit the circle
+icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+
+-- 3. The Overlay Border
+local border = minimapBtn:CreateTexture(nil, "OVERLAY")
+border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+border:SetSize(54, 54)
+border:SetPoint("TOPLEFT", 0, 0)
+
+minimapBtn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-Button-Highlight")
+
+function UpdateMinimapPosition(angle)
+    local radius = 100
+    local x = math.cos(angle) * radius
+    local y = math.sin(angle) * radius
+    minimapBtn:SetPoint("CENTER", Minimap, "CENTER", x, y)
+end
+
+minimapBtn:SetScript("OnDragStart", function()
+    minimapBtn:LockHighlight()
+    minimapBtn:SetScript("OnUpdate", function()
+        local mx, my = Minimap:GetCenter()
+        local px, py = GetCursorPosition()
+        local scale = Minimap:GetEffectiveScale()
+        px, py = px / scale, py / scale
         
-        -- Restore the minimap setting to the DB before saving
-        tempDB.minimapPos = AliasDB.minimapPos
-        AliasDB = tempDB
-        
-        self:UnregisterEvent("ADDON_LOADED")
-    end
+        local angle = math.atan2(py - my, px - mx)
+        AliasDB.minimapPos = angle
+        UpdateMinimapPosition(angle)
+    end)
 end)
 
-function RegisterAlias(alias, targetCommand)
-    local cleanAlias = string.upper(string.sub(alias, 2))
-    local cmdID = "CUSTOM_ALIAS_" .. cleanAlias
-    
-    _G["SLASH_" .. cmdID .. "1"] = alias
-    
-    SlashCmdList[cmdID] = function(msg)
-        local executeString = targetCommand
-        if msg and msg ~= "" then
-            executeString = executeString .. " " .. msg
-        end
-        local editBox = ChatEdit_ChooseBoxForSend()
-        editBox:SetText(executeString)
-        ChatEdit_SendText(editBox)
-    end
-    
-    hash_SlashCmdList[string.upper(alias)] = cmdID
-end
-
-function UnregisterAlias(alias)
-    local cleanAlias = string.upper(string.sub(alias, 2))
-    local cmdID = "CUSTOM_ALIAS_" .. cleanAlias
-    
-    _G["SLASH_" .. cmdID .. "1"] = nil
-    SlashCmdList[cmdID] = nil
-    hash_SlashCmdList[string.upper(alias)] = nil
-end
+minimapBtn:SetScript("OnDragStop", function()
+    minimapBtn:SetScript("OnUpdate", nil)
+    minimapBtn:UnlockHighlight()
+end)
 
 -- ==========================================
 -- User Interface (Alias Manager)
@@ -91,7 +92,7 @@ dragFrame:RegisterForDrag("LeftButton")
 dragFrame:SetScript("OnDragStart", function() UI:StartMoving() end)
 dragFrame:SetScript("OnDragStop", function() UI:StopMovingOrSizing() end)
 
--- Inputs
+-- INPUTS ROW
 local aliasInput = CreateFrame("EditBox", nil, UI, "InputBoxTemplate")
 aliasInput:SetSize(120, 30)
 aliasInput:SetPoint("TOPLEFT", UI, "TOPLEFT", 20, -40)
@@ -101,13 +102,60 @@ aliasLabel:SetPoint("BOTTOMLEFT", aliasInput, "TOPLEFT", 0, 0)
 aliasLabel:SetText("Alias (e.g., /hi)")
 
 local cmdInput = CreateFrame("EditBox", nil, UI, "InputBoxTemplate")
-cmdInput:SetSize(220, 30) 
+cmdInput:SetSize(180, 30) 
 cmdInput:SetPoint("LEFT", aliasInput, "RIGHT", 15, 0)
 cmdInput:SetAutoFocus(false)
 local cmdLabel = UI:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 cmdLabel:SetPoint("BOTTOMLEFT", cmdInput, "TOPLEFT", 0, 0)
 cmdLabel:SetText("Command (e.g., /hello)")
 
+local addBtn = CreateFrame("Button", nil, UI, "UIPanelButtonTemplate")
+addBtn:SetSize(60, 25)
+addBtn:SetPoint("LEFT", cmdInput, "RIGHT", 10, 0)
+addBtn:SetText("Add")
+
+-- MINIMAP TOGGLE CHECKBOX
+local minimapToggle = CreateFrame("CheckButton", nil, UI, "UICheckButtonTemplate")
+minimapToggle:SetSize(26, 26)
+minimapToggle:SetPoint("LEFT", addBtn, "RIGHT", 10, 0)
+local toggleLabel = UI:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+toggleLabel:SetPoint("BOTTOMLEFT", minimapToggle, "TOPLEFT", 0, 0)
+toggleLabel:SetText("Map Btn")
+
+minimapToggle:SetScript("OnClick", function(self)
+    AliasDB.showMinimap = self:GetChecked()
+    if AliasDB.showMinimap then
+        minimapBtn:Show()
+    else
+        minimapBtn:Hide()
+    end
+end)
+
+-- ADD BUTTON LOGIC
+addBtn:SetScript("OnClick", function()
+    local a = aliasInput:GetText()
+    local c = cmdInput:GetText()
+    
+    if a ~= "" and c ~= "" then
+        if string.sub(a, 1, 1) ~= "/" then a = "/" .. a end
+        if string.sub(c, 1, 1) ~= "/" then c = "/" .. c end
+        a = string.lower(a)
+        
+        AliasDB[a] = c
+        RegisterAlias(a, c) 
+        
+        aliasInput:SetText("")
+        cmdInput:SetText("")
+        aliasInput:ClearFocus()
+        cmdInput:ClearFocus()
+        print("|cFF00FF00Alias added:|r", a, "->", c)
+        UI:GetScript("OnShow")(UI) 
+    else
+        print("|cFFFF0000Error:|r Both fields must be filled.")
+    end
+end)
+
+-- SCROLL LIST
 local scrollFrame = CreateFrame("ScrollFrame", nil, UI, "UIPanelScrollFrameTemplate")
 scrollFrame:SetPoint("TOPLEFT", UI, "TOPLEFT", 15, -100)
 scrollFrame:SetPoint("BOTTOMRIGHT", UI, "BOTTOMRIGHT", -35, 15)
@@ -118,14 +166,14 @@ scrollFrame:SetScrollChild(contentFrame)
 
 local aliasRows = {}
 
-local function UpdateAliasList()
+UI:SetScript("OnShow", function()
     for _, row in ipairs(aliasRows) do row:Hide() end
 
     local yOffset = 0
     local rowIndex = 1
 
     for alias, command in pairs(AliasDB) do
-        if alias ~= "minimapPos" then
+        if alias ~= "minimapPos" and alias ~= "showMinimap" then
             local row = aliasRows[rowIndex]
             if not row then
                 row = CreateFrame("Frame", nil, contentFrame)
@@ -159,7 +207,7 @@ local function UpdateAliasList()
                 UnregisterAlias(alias)
                 AliasDB[alias] = nil
                 print("|cFF00FF00Alias removed:|r", alias)
-                UpdateAliasList()
+                UI:GetScript("OnShow")(UI) 
             end)
 
             row:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, yOffset)
@@ -169,93 +217,9 @@ local function UpdateAliasList()
             rowIndex = rowIndex + 1
         end
     end
-end
-
-local addBtn = CreateFrame("Button", nil, UI, "UIPanelButtonTemplate")
-addBtn:SetSize(60, 25)
-addBtn:SetPoint("LEFT", cmdInput, "RIGHT", 10, 0)
-addBtn:SetText("Add")
-addBtn:SetScript("OnClick", function()
-    local a = aliasInput:GetText()
-    local c = cmdInput:GetText()
-    
-    if a ~= "" and c ~= "" then
-        if string.sub(a, 1, 1) ~= "/" then a = "/" .. a end
-        if string.sub(c, 1, 1) ~= "/" then c = "/" .. c end
-        a = string.lower(a)
-        
-        AliasDB[a] = c
-        RegisterAlias(a, c) 
-        
-        aliasInput:SetText("")
-        cmdInput:SetText("")
-        aliasInput:ClearFocus()
-        cmdInput:ClearFocus()
-        print("|cFF00FF00Alias added:|r", a, "->", c)
-        UpdateAliasList()
-    else
-        print("|cFFFF0000Error:|r Both fields must be filled.")
-    end
 end)
 
-UI:SetScript("OnShow", UpdateAliasList)
-
--- ==========================================
--- Minimap Button
--- ==========================================
-
-local minimapBtn = CreateFrame("Button", "AliasMinimapButton", Minimap)
-minimapBtn:SetSize(32, 32)
-minimapBtn:SetFrameLevel(8)
-minimapBtn:RegisterForDrag("RightButton", "LeftButton")
-
-local bg = minimapBtn:CreateTexture(nil, "BACKGROUND")
-bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-bg:SetSize(25, 25)
-bg:SetPoint("CENTER")
-
--- Use a standard scroll icon to represent code/text
-local icon = minimapBtn:CreateTexture(nil, "ARTWORK")
-icon:SetTexture("Interface\\Icons\\INV_Scroll_03") 
-icon:SetSize(21, 21)
-icon:SetPoint("CENTER")
-
-local border = minimapBtn:CreateTexture(nil, "OVERLAY")
-border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-border:SetSize(54, 54)
-border:SetPoint("TOPLEFT", 11, -11)
-
-minimapBtn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-Button-Highlight")
-
--- Math to place the button on the minimap ring
-function UpdateMinimapPosition(angle)
-    local radius = 80
-    local x = math.cos(angle) * radius
-    local y = math.sin(angle) * radius
-    minimapBtn:SetPoint("CENTER", Minimap, "CENTER", x, y)
-end
-
--- Drag to move around the minimap
-minimapBtn:SetScript("OnDragStart", function()
-    minimapBtn:LockHighlight()
-    minimapBtn:SetScript("OnUpdate", function()
-        local mx, my = Minimap:GetCenter()
-        local px, py = GetCursorPosition()
-        local scale = Minimap:GetEffectiveScale()
-        px, py = px / scale, py / scale
-        
-        local angle = math.atan2(py - my, px - mx)
-        AliasDB.minimapPos = angle
-        UpdateMinimapPosition(angle)
-    end)
-end)
-
-minimapBtn:SetScript("OnDragStop", function()
-    minimapBtn:SetScript("OnUpdate", nil)
-    minimapBtn:UnlockHighlight()
-end)
-
--- Click to toggle UI
+-- Click to toggle UI from Minimap Button
 minimapBtn:SetScript("OnClick", function(self, button)
     if button == "LeftButton" then
         if UI:IsShown() then
@@ -266,7 +230,6 @@ minimapBtn:SetScript("OnClick", function(self, button)
     end
 end)
 
--- Tooltip text
 minimapBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText("Alias")
@@ -280,8 +243,72 @@ minimapBtn:SetScript("OnLeave", function()
 end)
 
 -- ==========================================
--- Core Menu Command
+-- Database Loader & Core Logic Hook
 -- ==========================================
+
+local EventFrame = CreateFrame("Frame")
+EventFrame:RegisterEvent("ADDON_LOADED")
+EventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
+    if loadedAddon == addonName then
+        AliasDB = AliasDB or {}
+        
+        AliasDB.minimapPos = AliasDB.minimapPos or (math.pi / 4) 
+        if AliasDB.showMinimap == nil then AliasDB.showMinimap = true end
+
+        UpdateMinimapPosition(AliasDB.minimapPos)
+        
+        if AliasDB.showMinimap then
+            minimapBtn:Show()
+        else
+            minimapBtn:Hide()
+        end
+        
+        minimapToggle:SetChecked(AliasDB.showMinimap)
+
+        local tempDB = {}
+        for alias, cmd in pairs(AliasDB) do
+            if alias ~= "minimapPos" and alias ~= "showMinimap" then 
+                local lowerAlias = string.lower(alias)
+                tempDB[lowerAlias] = cmd
+                RegisterAlias(lowerAlias, cmd) 
+            end
+        end
+        
+        tempDB.minimapPos = AliasDB.minimapPos
+        tempDB.showMinimap = AliasDB.showMinimap
+        AliasDB = tempDB
+        
+        self:UnregisterEvent("ADDON_LOADED")
+    end
+end)
+
+function RegisterAlias(alias, targetCommand)
+    local cleanAlias = string.upper(string.sub(alias, 2))
+    local cmdID = "CUSTOM_ALIAS_" .. cleanAlias
+    
+    _G["SLASH_" .. cmdID .. "1"] = alias
+    
+    SlashCmdList[cmdID] = function(msg)
+        local executeString = targetCommand
+        if msg and msg ~= "" then
+            executeString = executeString .. " " .. msg
+        end
+        local editBox = ChatEdit_ChooseBoxForSend()
+        editBox:SetText(executeString)
+        ChatEdit_SendText(editBox)
+    end
+    
+    hash_SlashCmdList[string.upper(alias)] = cmdID
+end
+
+function UnregisterAlias(alias)
+    local cleanAlias = string.upper(string.sub(alias, 2))
+    local cmdID = "CUSTOM_ALIAS_" .. cleanAlias
+    
+    _G["SLASH_" .. cmdID .. "1"] = nil
+    SlashCmdList[cmdID] = nil
+    hash_SlashCmdList[string.upper(alias)] = nil
+end
 
 SLASH_ALIASMANAGER1 = "/alias"
 SlashCmdList["ALIASMANAGER"] = function()
