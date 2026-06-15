@@ -81,6 +81,24 @@ UI.title = UI:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 UI.title:SetPoint("CENTER", UI.TitleBg, "CENTER", 0, 0)
 UI.title:SetText("Alias Manager")
 
+--- DRAG FUNCTIONALITY ---
+UI:SetMovable(true)
+UI:SetClampedToScreen(true) -- Prevents dragging the window completely off-screen
+
+-- Create an invisible drag handle over the title bar
+local dragFrame = CreateFrame("Frame", nil, UI)
+dragFrame:SetPoint("TOPLEFT", UI, "TOPLEFT", 0, 0)
+dragFrame:SetPoint("BOTTOMRIGHT", UI, "TOPRIGHT", 0, -30) -- Covers the top 30 pixels (title bar)
+dragFrame:EnableMouse(true)
+dragFrame:RegisterForDrag("LeftButton")
+
+dragFrame:SetScript("OnDragStart", function() 
+    UI:StartMoving() 
+end)
+dragFrame:SetScript("OnDragStop", function() 
+    UI:StopMovingOrSizing() 
+end)
+
 local aliasInput = CreateFrame("EditBox", nil, UI, "InputBoxTemplate")
 aliasInput:SetSize(120, 30)
 aliasInput:SetPoint("TOPLEFT", UI, "TOPLEFT", 20, -40)
