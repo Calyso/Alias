@@ -48,23 +48,32 @@ function UpdateMinimapPosition(angle)
     minimapBtn:SetPoint("CENTER", Minimap, "CENTER", x, y)
 end
 
-minimapBtn:SetScript("OnDragStart", function()
-    minimapBtn:LockHighlight()
-    minimapBtn:SetScript("OnUpdate", function()
+function UpdateMinimapPosition(angle)
+    local radius = 80 -- Adjust this to fit your minimap radius
+    -- Using math.cos and sin only when the position actually changes
+    local x = math.cos(angle) * radius
+    local y = math.sin(angle) * radius
+    minimapBtn:SetPoint("CENTER", Minimap, "CENTER", x, y)
+end
+
+minimapBtn:SetScript("OnDragStart", function(self)
+    self:LockHighlight()
+    -- Only run the update while dragging
+    self:SetScript("OnUpdate", function()
         local mx, my = Minimap:GetCenter()
-        local px, py = GetCursorPosition()
+        local cx, cy = GetCursorPosition()
         local scale = Minimap:GetEffectiveScale()
-        px, py = px / scale, py / scale
+        -- Calculate the angle from center
+        local angle = math.atan2((cy / scale) - my, (cx / scale) - mx)
         
-        local angle = math.atan2(py - my, px - mx)
         AliasDB.minimapPos = angle
         UpdateMinimapPosition(angle)
     end)
 end)
 
-minimapBtn:SetScript("OnDragStop", function()
-    minimapBtn:SetScript("OnUpdate", nil)
-    minimapBtn:UnlockHighlight()
+minimapBtn:SetScript("OnDragStop", function(self)
+    self:SetScript("OnUpdate", nil) -- Stop the CPU-heavy loop immediately
+    self:UnlockHighlight()
 end)
 
 -- ==========================================

@@ -1,8 +1,8 @@
-## Interface: 120005
+## Interface: 120007
 ## Title: Alias
 ## Notes: Allows creation of custom Linux-style chat command aliases.
 ## Author: Caly-Zul'jin
-## Version: 1.1.2
+## Version: 1.3
 ## SavedVariables: AliasDB
 
 Alias.lua
