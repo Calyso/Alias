@@ -1,0 +1,1 @@
+2.0.0: Added functionality to utilize EllesmereUI skinning, or ignore if EllesmereUI isn't loaded.
