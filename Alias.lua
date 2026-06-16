@@ -242,6 +242,29 @@ minimapBtn:SetScript("OnLeave", function()
     GameTooltip:Hide()
 end)
 
+-- Allow EllesmereUI to skin our frames if available
+local function ApplyEUIStyles()
+    if not EllesmereUI or not EllesmereUI.PP or not EllesmereUI.PP.CreateBorder then return end
+    local PP = EllesmereUI.PP
+    local RS = EllesmereUI.RESKIN or {}
+
+    -- Skin main UI frame
+    if UI and not UI._euiSkinned then
+        if UI.TitleBg and UI.TitleBg.SetAlpha then UI.TitleBg:SetAlpha(0) end
+        PP.CreateBorder(UI, 1, 1, 1, (RS.BRD_ALPHA or 0.9), 1, "OVERLAY", 7)
+        UI._euiSkinned = true
+    end
+
+    -- Skin minimap button
+    if minimapBtn and not minimapBtn._euiSkinned then
+        if border and border.Hide then border:Hide() end
+        if bg and bg.Hide then bg:Hide() end
+        if icon and icon.SetTexCoord then icon:SetTexCoord(0, 1, 0, 1) end
+        PP.CreateBorder(minimapBtn, 1, 1, 1, (RS.BRD_ALPHA or 0.9), 1, "OVERLAY", 7)
+        minimapBtn._euiSkinned = true
+    end
+end
+
 -- ==========================================
 -- Database Loader & Core Logic Hook
 -- ==========================================
@@ -277,8 +300,14 @@ EventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
         tempDB.minimapPos = AliasDB.minimapPos
         tempDB.showMinimap = AliasDB.showMinimap
         AliasDB = tempDB
+
+        -- Apply EllesmereUI styles if available
+        ApplyEUIStyles()
         
         self:UnregisterEvent("ADDON_LOADED")
+    elseif loadedAddon == "EllesmereUI" then
+        -- EllesmereUI loaded after this addon; apply skins now
+        ApplyEUIStyles()
     end
 end)
 
