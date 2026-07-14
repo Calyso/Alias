@@ -33,4 +33,4 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 
 
 ## Support & Feedback
-If you encounter any issues or have feature requests, please report them on the project page where you downloaded this add-on. However, note that this addon is provided as-is. I am not a devloper and likely won't update functionality or fix bugs unless it's something I want/want to fix.
+This addon is provided as-is. I am not a devloper and likely won't update functionality or fix bugs unless it's something I want/want to fix.
