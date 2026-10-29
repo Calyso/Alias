@@ -299,17 +299,31 @@ end)
 -- and never saved.
 
 -- True if the name is owned by a built-in command or another addon.
+-- The authoritative list of claimed names is in the SLASH_<key>1,
+-- SLASH_<key>2 ... globals each SlashCmdList entry publishes, so we
+-- compare those names. Key names are not reliable: the client stores
+-- its built-ins under keys that do not match the command (its /g is not
+-- under "G"), and one key can serve several names. The hash lookup is
+-- kept as a fast path, but the scan below is the real check, because
+-- the client builds the hash lazily.
 local function CommandNameTaken(alias)
     local upper = string.upper(alias)
     local owner = hash_SlashCmdList[upper]
-    if owner ~= nil then
-        return owner ~= ("CUSTOM_ALIAS_" .. string.upper(string.sub(alias, 2)))
+    if owner ~= nil and owner ~= ("CUSTOM_ALIAS_" .. string.upper(string.sub(alias, 2))) then
+        return true
     end
-    -- Some entries exist in SlashCmdList without a hash entry; scan them.
-    local name = string.lower(string.sub(alias, 2))
+    local target = string.lower(alias)
     for key in pairs(SlashCmdList) do
-        if string.lower(key) == name then
-            return true
+        local i = 1
+        while true do
+            local s = _G["SLASH_" .. key .. i]
+            if type(s) ~= "string" then
+                break
+            end
+            if string.lower(s) == target then
+                return true
+            end
+            i = i + 1
         end
     end
     return false
