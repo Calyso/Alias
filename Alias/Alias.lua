@@ -4,6 +4,7 @@
 -- ==========================================
 
 local ADDON_NAME = "Alias"
+local MANAGER_COMMAND = "/alias"
 
 -- Saved variable (declared in Alias.toc). Window settings live alongside
 -- the aliases; IsAliasKey keeps them out of the alias list.
@@ -174,8 +175,19 @@ addBtn:SetScript("OnClick", function()
     if string.sub(command, 1, 1) ~= "/" then command = "/" .. command end
     alias = string.lower(alias)
 
+    -- Refreshing an alias we own needs the old registration cleared first.
+    -- Never touch a name we don't own.
+    if alias ~= MANAGER_COMMAND and DB[alias] ~= nil then
+        UnregisterAlias(alias)
+    end
+
+    -- Register first: a taken name must never be saved.
+    if not RegisterAlias(alias, command) then
+        print("|cFFFF0000Error:|r " .. alias .. " is already taken by another command.")
+        return
+    end
+
     DB[alias] = command
-    RegisterAlias(alias, command)
 
     aliasInput:SetText("")
     cmdInput:SetText("")
@@ -276,38 +288,94 @@ end)
 -- ==========================================
 -- Slash Commands
 -- ==========================================
+-- Uses the client's standard SlashCmdList mechanism: a handler in
+-- SlashCmdList, a SLASH_* global for tab completion, and a hash_SlashCmdList
+-- entry so the client dispatches the name case-insensitively. This is the
+-- same mechanism the other addons on this client use, and it worked in game
+-- in 2.0.1.
+--
+-- RegisterAlias returns true on success and nil if the name is already
+-- taken (a built-in command or another addon), so a taken name is rejected
+-- and never saved.
 
+-- True if the name is owned by a built-in command or another addon.
+local function CommandNameTaken(alias)
+    local upper = string.upper(alias)
+    local owner = hash_SlashCmdList[upper]
+    if owner ~= nil then
+        return owner ~= ("CUSTOM_ALIAS_" .. string.upper(string.sub(alias, 2)))
+    end
+    -- Some entries exist in SlashCmdList without a hash entry; scan them.
+    local name = string.lower(string.sub(alias, 2))
+    for key in pairs(SlashCmdList) do
+        if string.lower(key) == name then
+            return true
+        end
+    end
+    return false
+end
+
+-- Registers an alias as a chat command.
+-- Returns true on success, nil if the name is already taken.
 function RegisterAlias(alias, command)
+    if CommandNameTaken(alias) then
+        return nil
+    end
+
     local cmdID = "CUSTOM_ALIAS_" .. string.upper(string.sub(alias, 2))
-    _G["SLASH_" .. cmdID .. "1"] = alias
     SlashCmdList[cmdID] = function(msg)
         local executeString = command
-        print("|cFF00CCFFAlias Used:|r " .. alias .. " > " .. command)
         if msg and msg ~= "" then
             executeString = executeString .. " " .. msg
         end
+        print("|cFF00CCFFAlias Used:|r " .. alias .. " > " .. command)
         local editBox = ChatEdit_ChooseBoxForSend()
         editBox:SetText(executeString)
         ChatEdit_SendText(editBox)
     end
+    _G["SLASH_" .. cmdID .. "1"] = alias
     hash_SlashCmdList[string.upper(alias)] = cmdID
+
+    return true
 end
 
+-- Unregisters a command this addon registered. Entries we do not own are
+-- left untouched.
 function UnregisterAlias(alias)
     local cmdID = "CUSTOM_ALIAS_" .. string.upper(string.sub(alias, 2))
-    _G["SLASH_" .. cmdID .. "1"] = nil
-    SlashCmdList[cmdID] = nil
-    hash_SlashCmdList[string.upper(alias)] = nil
-end
-
-SLASH_ALIASMANAGER1 = "/alias"
-SlashCmdList["ALIASMANAGER"] = function()
-    if UI:IsShown() then
-        UI:Hide()
-    else
-        UI:Show()
+    if SlashCmdList[cmdID] ~= nil then
+        SlashCmdList[cmdID] = nil
+    end
+    local slashGlobal = "SLASH_" .. cmdID .. "1"
+    if _G[slashGlobal] == alias then
+        _G[slashGlobal] = nil
+    end
+    if hash_SlashCmdList[string.upper(alias)] == cmdID then
+        hash_SlashCmdList[string.upper(alias)] = nil
     end
 end
+
+-- /alias opens or closes the window. If the name is taken, the minimap
+-- button still works, so we just say so. This block is wrapped so that even
+-- an unexpected error here can never stop the rest of the addon (skinning,
+-- startup) from loading.
+pcall(function()
+    if CommandNameTaken(MANAGER_COMMAND) then
+        print("|cFFFF0000Alias:|r Could not register " .. MANAGER_COMMAND ..
+            " (that command name is already in use). Use the minimap button to open the window.")
+        return
+    end
+
+    SlashCmdList["ALIASMANAGER"] = function()
+        if UI:IsShown() then
+            UI:Hide()
+        else
+            UI:Show()
+        end
+    end
+    _G["SLASH_ALIASMANAGER1"] = MANAGER_COMMAND
+    hash_SlashCmdList[string.upper(MANAGER_COMMAND)] = "ALIASMANAGER"
+end)
 
 -- ==========================================
 -- EllesmereUI Skinning
@@ -379,7 +447,12 @@ EventFrame:SetScript("OnEvent", function(self, event, loadedAddon)
             DB[lowerAlias] = DB[alias]
             DB[alias] = nil
         end
-        RegisterAlias(lowerAlias, DB[lowerAlias])
+        -- A saved name may have been taken since (a game update or another
+        -- addon). Keep the entry so it shows in the list; warn once.
+        if not RegisterAlias(lowerAlias, DB[lowerAlias]) then
+            print("|cFFFF0000Alias:|r Could not register " .. lowerAlias ..
+                " (that command name is already in use).")
+        end
     end
 
     self:UnregisterEvent("ADDON_LOADED")
