@@ -298,16 +298,52 @@ end)
 -- taken (a built-in command or another addon), so a taken name is rejected
 -- and never saved.
 
+-- Standard chat channel commands. The client runs these from its core
+-- code and never publishes them in SlashCmdList or the SLASH_* globals,
+-- so no registry scan can see them. They are blocked here by name.
+local BUILTIN_CHANNEL_NAMES = {
+    ["/S"] = true,       ["/SAY"] = true,
+    ["/P"] = true,       ["/PARTY"] = true,
+    ["/R"] = true,       ["/RAID"] = true,
+    ["/G"] = true,       ["/GUILD"] = true,
+    ["/O"] = true,       ["/OFFICER"] = true,
+    ["/W"] = true,       ["/WH"] = true,     ["/WHISPER"] = true,
+    ["/I"] = true,       ["/INSTANCE"] = true,
+    ["/B"] = true,       ["/BG"] = true,     ["/BATTLEGROUND"] = true,
+    ["/V"] = true,       ["/VOICE"] = true,
+    ["/Y"] = true,       ["/YELL"] = true,
+    ["/T"] = true,       ["/TRADE"] = true,
+    ["/E"] = true,       ["/EM"] = true,     ["/EMOTE"] = true,   ["/ME"] = true,
+}
+
 -- True if the name is owned by a built-in command or another addon.
--- The authoritative list of claimed names is in the SLASH_<key>1,
--- SLASH_<key>2 ... globals each SlashCmdList entry publishes, so we
--- compare those names. Key names are not reliable: the client stores
--- its built-ins under keys that do not match the command (its /g is not
--- under "G"), and one key can serve several names. The hash lookup is
--- kept as a fast path, but the scan below is the real check, because
--- the client builds the hash lazily.
+-- Three sources of taken names:
+--   1. Channel numbers (/1 .. /25) and BUILTIN_CHANNEL_NAMES above: the
+--      client's own channel commands, which no registry exposes.
+--   2. hash_ChatTypeInfoList: the client's chat type registry, checked
+--      the same way the client's chat code checks it, so any chat type
+--      the client knows about is protected.
+--   3. Addon commands, via the SLASH_<key>1, SLASH_<key>2 ... globals
+--      each SlashCmdList entry publishes. Key names are not reliable:
+--      the client stores its built-ins under keys that do not match the
+--      command (its /g is not under "G"), and one key can serve several
+--      names. The hash lookup is kept as a fast path, but the scan is
+--      the real check, because the client builds the hash lazily.
 local function CommandNameTaken(alias)
     local upper = string.upper(alias)
+    if alias:match("^/%d+$") then
+        return true
+    end
+    if BUILTIN_CHANNEL_NAMES[upper] then
+        return true
+    end
+    local types = hash_ChatTypeInfoList
+    if type(types) == "table" then
+        local chatType = types[upper]
+        if chatType ~= nil and ChatTypeInfo ~= nil and ChatTypeInfo[chatType] ~= nil then
+            return true
+        end
+    end
     local owner = hash_SlashCmdList[upper]
     if owner ~= nil and owner ~= ("CUSTOM_ALIAS_" .. string.upper(string.sub(alias, 2))) then
         return true
