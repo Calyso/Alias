@@ -4,6 +4,8 @@
 -- ==========================================
 
 local ADDON_NAME = "Alias"
+-- Keep in sync with ## Version in Alias.toc (WoW cannot read the .toc at runtime).
+local ADDON_VERSION = "2.0.5"
 local MANAGER_COMMAND = "/alias"
 
 -- Saved variable (declared in Alias.toc). Window settings live alongside
@@ -108,7 +110,7 @@ tinsert(UISpecialFrames, "AliasFrame")
 
 UI.title = UI:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 UI.title:SetPoint("CENTER", UI.TitleBg, "CENTER", 0, 0)
-UI.title:SetText("Alias")
+UI.title:SetText("Alias | " .. ADDON_VERSION)
 
 UI:SetMovable(true)
 UI:SetClampedToScreen(true)
